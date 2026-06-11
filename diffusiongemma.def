@@ -7,8 +7,8 @@
 # ============================================================
 
 Bootstrap: docker
-# vLLM nightly に pin 留め (torch/CUDA との整合が取れたビルドを再現可能にする)
-From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
+# DiffusionGemma 対応版の公式タグ (2026-06-10 リリース)
+From: vllm/vllm-openai:gemma
 
 %labels
     Maintainer Iwao KIMURA
@@ -32,12 +32,7 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
     export PYTHONUNBUFFERED=1
 
 %post
-    # vLLM はベースイメージ (nightly pin) のものをそのまま使う。
-    # transformers は純粋 Python のため torch/CUDA の整合を壊さずに更新できる。
-    # DiffusionGemma (diffusion_gemma アーキテクチャ) はリリース版未収録のため
-    # git 不要の tarball URL で main HEAD を直接インストール。
-    pip install --no-cache-dir \
-        "https://github.com/huggingface/transformers/archive/refs/heads/main.tar.gz"
+    # gemma タグは DiffusionGemma 対応の transformers を含む。追加インストール不要。
     # OpenAI Python クライアント (推論スクリプト用)
     pip install --no-cache-dir "openai>=1.0.0"
 
