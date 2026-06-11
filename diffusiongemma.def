@@ -33,7 +33,10 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
 
 %post
     # vLLM はベースイメージ (nightly pin) のものをそのまま使う。
-    # pip での上書きはベースの torch/CUDA との整合を壊すため行わない。
+    # transformers は純粋 Python のため torch/CUDA の整合を壊さずに更新できる。
+    # DiffusionGemma (diffusion_gemma アーキテクチャ) はリリース版未収録のため git HEAD を使用。
+    pip install --no-cache-dir \
+        "git+https://github.com/huggingface/transformers.git"
     # OpenAI Python クライアント (推論スクリプト用)
     pip install --no-cache-dir "openai>=1.0.0"
 
