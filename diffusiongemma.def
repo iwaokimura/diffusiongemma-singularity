@@ -55,7 +55,6 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
         --attention-backend TRITON_ATTN \
         --generation-config vllm \
         --hf-overrides '{"diffusion_sampler": "entropy_bound", "diffusion_entropy_bound": 0.1}' \
-        --diffusion-config '{"canvas_length": 256}' \
         --reasoning-parser gemma4 \
         --enable-chunked-prefill \
         "$@"
@@ -71,7 +70,6 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
         --attention-backend TRITON_ATTN \
         --generation-config vllm \
         --hf-overrides '{"diffusion_sampler": "entropy_bound", "diffusion_entropy_bound": 0.1}' \
-        --diffusion-config '{"canvas_length": 256}' \
         --reasoning-parser gemma4 \
         --enable-chunked-prefill \
         "$@"
