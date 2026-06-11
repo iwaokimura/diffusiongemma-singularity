@@ -34,9 +34,10 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
 %post
     # vLLM はベースイメージ (nightly pin) のものをそのまま使う。
     # transformers は純粋 Python のため torch/CUDA の整合を壊さずに更新できる。
-    # DiffusionGemma (diffusion_gemma アーキテクチャ) はリリース版未収録のため git HEAD を使用。
+    # DiffusionGemma (diffusion_gemma アーキテクチャ) はリリース版未収録のため
+    # git 不要の tarball URL で main HEAD を直接インストール。
     pip install --no-cache-dir \
-        "git+https://github.com/huggingface/transformers.git"
+        "https://github.com/huggingface/transformers/archive/refs/heads/main.tar.gz"
     # OpenAI Python クライアント (推論スクリプト用)
     pip install --no-cache-dir "openai>=1.0.0"
 
