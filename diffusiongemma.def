@@ -46,7 +46,7 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
     #!/bin/bash
     # デフォルト動作: vllm serve で DiffusionGemma を起動
     # 引数を全て vllm serve に渡す
-    exec python -m vllm.entrypoints.openai.api_server \
+    exec python3 -m vllm.entrypoints.openai.api_server \
         --model RedHatAI/diffusiongemma-26B-A4B-it-NVFP4 \
         --trust-remote-code \
         --max-model-len 32768 \
@@ -62,7 +62,7 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
 
 %startscript
     #!/bin/bash
-    exec python -m vllm.entrypoints.openai.api_server \
+    exec python3 -m vllm.entrypoints.openai.api_server \
         --model RedHatAI/diffusiongemma-26B-A4B-it-NVFP4 \
         --trust-remote-code \
         --max-model-len 32768 \
@@ -78,8 +78,8 @@ From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
 
 %test
     # イメージの健全性チェック
-    python -c "import vllm; print(f'vLLM version: {vllm.__version__}')"
-    python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
+    python3 -c "import vllm; print(f'vLLM version: {vllm.__version__}')"
+    python3 -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
     echo "Image test passed."
 
 %help
