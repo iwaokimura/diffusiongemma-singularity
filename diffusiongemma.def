@@ -1,0 +1,113 @@
+# ============================================================
+# DiffusionGemma Singularity CE Definition File
+# Bootstrap: Docker (vLLM official image)
+# Target: Ubuntu + Singularity CE + NVIDIA GPU
+# Usage:
+#   singularity run --nv diffusiongemma.sif [options]
+# ============================================================
+
+Bootstrap: docker
+# vLLM nightly に pin 留め (torch/CUDA との整合が取れたビルドを再現可能にする)
+From: vllm/vllm-openai:nightly-2c9c07c85e56c799afffd5a671a8a0bace377a39
+
+%labels
+    Maintainer Iwao KIMURA
+    Description DiffusionGemma 26B-A4B via vLLM (text diffusion LLM)
+    Version 1.0.0
+
+%environment
+    # CUDA 環境
+    export CUDA_HOME=/usr/local/cuda
+    export LD_LIBRARY_PATH=$CUDA_HOME/lib64:$LD_LIBRARY_PATH
+    export PATH=$CUDA_HOME/bin:$PATH
+
+    # vLLM: ModelRunner v2 (DiffusionGemma必須)
+    export VLLM_USE_V2_MODEL_RUNNER=1
+
+    # HuggingFace キャッシュ (ホスト側ディレクトリをバインドして使う想定)
+    export HF_HOME=${HF_HOME:-/cache/huggingface}
+    export TRANSFORMERS_CACHE=${HF_HOME}/hub
+
+    # Python unbuffered output
+    export PYTHONUNBUFFERED=1
+
+%post
+    # vLLM はベースイメージ (nightly pin) のものをそのまま使う。
+    # pip での上書きはベースの torch/CUDA との整合を壊すため行わない。
+    # OpenAI Python クライアント (推論スクリプト用)
+    pip install --no-cache-dir "openai>=1.0.0"
+
+    # キャッシュディレクトリ作成
+    mkdir -p /cache/huggingface
+
+    echo "Build complete: DiffusionGemma Singularity image"
+
+%runscript
+    #!/bin/bash
+    # デフォルト動作: vllm serve で DiffusionGemma を起動
+    # 引数を全て vllm serve に渡す
+    exec python -m vllm.entrypoints.openai.api_server \
+        --model RedHatAI/diffusiongemma-26B-A4B-it-NVFP4 \
+        --trust-remote-code \
+        --max-model-len 32768 \
+        --max-num-seqs 4 \
+        --gpu-memory-utilization 0.85 \
+        --attention-backend TRITON_ATTN \
+        --generation-config vllm \
+        --hf-overrides '{"diffusion_sampler": "entropy_bound", "diffusion_entropy_bound": 0.1}' \
+        --diffusion-config '{"canvas_length": 256}' \
+        --reasoning-parser gemma4 \
+        --enable-chunked-prefill \
+        "$@"
+
+%startscript
+    #!/bin/bash
+    exec python -m vllm.entrypoints.openai.api_server \
+        --model RedHatAI/diffusiongemma-26B-A4B-it-NVFP4 \
+        --trust-remote-code \
+        --max-model-len 32768 \
+        --max-num-seqs 4 \
+        --gpu-memory-utilization 0.85 \
+        --attention-backend TRITON_ATTN \
+        --generation-config vllm \
+        --hf-overrides '{"diffusion_sampler": "entropy_bound", "diffusion_entropy_bound": 0.1}' \
+        --diffusion-config '{"canvas_length": 256}' \
+        --reasoning-parser gemma4 \
+        --enable-chunked-prefill \
+        "$@"
+
+%test
+    # イメージの健全性チェック
+    python -c "import vllm; print(f'vLLM version: {vllm.__version__}')"
+    python -c "import torch; print(f'PyTorch: {torch.__version__}'); print(f'CUDA available: {torch.cuda.is_available()}')"
+    echo "Image test passed."
+
+%help
+    DiffusionGemma 26B-A4B (vLLM) Singularity Image
+
+    == 基本的な使い方 ==
+
+    # サーバー起動 (GPU バインド必須)
+    singularity run --nv \
+        -B ~/.cache/huggingface:/cache/huggingface \
+        diffusiongemma.sif
+
+    # モデルキャッシュ先を変える場合
+    singularity run --nv \
+        -B /path/to/hf_cache:/cache/huggingface \
+        diffusiongemma.sif --port 8080
+
+    # デフォルトは NVFP4 量子化版 (RedHatAI/diffusiongemma-26B-A4B-it-NVFP4,
+    # 重み ~14GB, RTX 4090 など 24GB GPU 向け)。
+    # BF16 フルモデルを使う場合 (VRAM 60GB+ の GPU 向け):
+    singularity run --nv \
+        -B ~/.cache/huggingface:/cache/huggingface \
+        diffusiongemma.sif \
+        --model google/diffusiongemma-26B-A4B-it
+
+    # シェルに入る場合
+    singularity shell --nv diffusiongemma.sif
+
+    == 推論スクリプト ==
+    サーバー起動後、infer.py を参照してください。
+

@@ -1,0 +1,115 @@
+# ============================================================
+# GitHub Actions: Singularity CE イメージのビルドと
+#                 GitHub Container Registry (ghcr.io) への Push
+#
+# Trigger:
+#   - main/master ブランチへの push
+#   - Pull Request (ビルドのみ、push なし)
+#   - 手動実行 (workflow_dispatch)
+# ============================================================
+
+name: Build Singularity Image
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "diffusiongemma.def"
+      - ".github/workflows/build-singularity.yml"
+  pull_request:
+    branches: [main, master]
+    paths:
+      - "diffusiongemma.def"
+  workflow_dispatch:
+    inputs:
+      push_image:
+        description: "Push image to ghcr.io"
+        required: false
+        default: true
+        type: boolean
+
+env:
+  IMAGE_NAME: diffusiongemma-vllm
+  REGISTRY: ghcr.io
+
+jobs:
+  build-and-push:
+    name: Build Singularity SIF & Push to GHCR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write  # ghcr.io への push に必要
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # vLLM ベースイメージは展開後 20GB 超のため、
+      # ランナーの不要なプリインストールを削除して空き容量を確保する
+      - name: Free disk space on runner
+        run: |
+          df -h /
+          sudo rm -rf /usr/share/dotnet
+          sudo rm -rf /usr/local/lib/android
+          sudo rm -rf /opt/ghc /usr/local/.ghcup
+          sudo rm -rf /opt/hostedtoolcache/CodeQL
+          sudo rm -rf /usr/share/swift
+          sudo rm -rf /usr/local/share/boost
+          sudo docker image prune --all --force
+          df -h /
+
+      # コンテナ内ではなくランナー上に Apptainer を直接インストールする
+      # (container 実行だとホストのディスク掃除が効かないため)
+      - name: Install Apptainer
+        uses: eWaterCycle/setup-apptainer@v2
+        with:
+          apptainer-version: 1.3.6
+
+      - name: Extract metadata (tag)
+        id: meta
+        run: |
+          SHORT_SHA=$(echo "${GITHUB_SHA}" | cut -c1-7)
+          DATE=$(date +%Y%m%d)
+          echo "tag=${DATE}-${SHORT_SHA}" >> $GITHUB_OUTPUT
+          echo "image=${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ env.IMAGE_NAME }}" >> $GITHUB_OUTPUT
+
+      - name: Build Singularity SIF image
+        run: |
+          # ランナーは passwordless sudo が使えるため root でビルド (fakeroot 不要)
+          sudo apptainer build diffusiongemma.sif diffusiongemma.def
+          sudo chown "$(id -u):$(id -g)" diffusiongemma.sif
+          echo "SIF build complete."
+          ls -lh diffusiongemma.sif
+          df -h /
+
+      # PR 時はビルド確認のみ、push なし
+      - name: Login to GitHub Container Registry
+        if: >
+          github.event_name != 'pull_request' &&
+          (github.event_name != 'workflow_dispatch' || inputs.push_image == true)
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+          apptainer registry login \
+            -u "${{ github.repository_owner }}" \
+            --password-stdin \
+            oras://ghcr.io
+
+      - name: Push SIF to GHCR (ORAS)
+        if: >
+          github.event_name != 'pull_request' &&
+          (github.event_name != 'workflow_dispatch' || inputs.push_image == true)
+        run: |
+          IMAGE="${{ steps.meta.outputs.image }}"
+          TAG="${{ steps.meta.outputs.tag }}"
+          apptainer push diffusiongemma.sif "oras://${IMAGE}:${TAG}"
+          apptainer push diffusiongemma.sif "oras://${IMAGE}:latest"
+          echo "Pushed: oras://${IMAGE}:${TAG}"
+          echo "Pushed: oras://${IMAGE}:latest"
+
+      - name: Upload SIF as artifact (for PRs or download)
+        uses: actions/upload-artifact@v4
+        with:
+          name: diffusiongemma-sif-${{ steps.meta.outputs.tag }}
+          path: diffusiongemma.sif
+          retention-days: 7
+
